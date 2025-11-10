@@ -73,12 +73,13 @@ func (h *httpClient) GetPart(ctx context.Context, baseURL, fileID string, index 
 	}
 
 	resp, err := h.c.Do(req)
-	defer resp.Body.Close()
 	if err != nil {
+		resp.Body.Close()
 		return nil, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
 		return nil, fmt.Errorf("storage GET failed: %s", resp.Status)
 	}
 
