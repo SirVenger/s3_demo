@@ -1,0 +1,8 @@
+/tmp/
+/.idea/
+/.vscode/
+/bin/
+/dist/
+/cover.out
+**/*.db
+

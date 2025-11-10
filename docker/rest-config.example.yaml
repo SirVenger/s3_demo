@@ -1,0 +1,10 @@
+﻿listen_addr: ":8080"
+meta_path: "/data/meta.db"
+storages:
+  - "http://storage1:8081"
+  - "http://storage2:8081"
+  - "http://storage3:8081"
+  - "http://storage4:8081"
+  - "http://storage5:8081"
+  - "http://storage6:8081"
+

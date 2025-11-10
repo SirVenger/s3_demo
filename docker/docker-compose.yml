@@ -1,0 +1,87 @@
+﻿version: "3.9"
+services:
+  rest:
+    build:
+      context: ..
+      dockerfile: docker/rest.Dockerfile
+    environment:
+      - CONFIG_PATH=/app/config.yaml
+    volumes:
+      - ./rest-config.yaml:/app/config.yaml:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      - storage1
+      - storage2
+      - storage3
+      - storage4
+      - storage5
+      - storage6
+  storage1:
+    build:
+      context: ..
+      dockerfile: docker/storage.Dockerfile
+    environment:
+      - DATA_DIR=/data
+    volumes:
+      - storage1:/data
+    ports:
+      - "8081:8081"
+  storage2:
+    build:
+      context: ..
+      dockerfile: docker/storage.Dockerfile
+    environment:
+      - DATA_DIR=/data
+    volumes:
+      - storage2:/data
+    ports:
+      - "8082:8081"
+  storage3:
+    build:
+      context: ..
+      dockerfile: docker/storage.Dockerfile
+    environment:
+      - DATA_DIR=/data
+    volumes:
+      - storage3:/data
+    ports:
+      - "8083:8081"
+  storage4:
+    build:
+      context: ..
+      dockerfile: docker/storage.Dockerfile
+    environment:
+      - DATA_DIR=/data
+    volumes:
+      - storage4:/data
+    ports:
+      - "8084:8081"
+  storage5:
+    build:
+      context: ..
+      dockerfile: docker/storage.Dockerfile
+    environment:
+      - DATA_DIR=/data
+    volumes:
+      - storage5:/data
+    ports:
+      - "8085:8081"
+  storage6:
+    build:
+      context: ..
+      dockerfile: docker/storage.Dockerfile
+    environment:
+      - DATA_DIR=/data
+    volumes:
+      - storage6:/data
+    ports:
+      - "8086:8081"
+volumes:
+  storage1: {}
+  storage2: {}
+  storage3: {}
+  storage4: {}
+  storage5: {}
+  storage6: {}
+
