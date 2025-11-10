@@ -40,9 +40,25 @@ func New() Client {
 // PutPart загружает часть файла в указанный storage.
 func (h *httpClient) PutPart(ctx context.Context, baseURL string, req PutPartRequest) error {
 	u := fmt.Sprintf(storageproto.PartsPathFormat, baseURL, req.FileID, req.Index)
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, u, req.Reader)
+	body := req.Reader
+	var bar *progressBar
+	if body != nil {
+		bar = newProgressBar(
+			fmt.Sprintf("Uploading %s part %d/%d", req.FileID, req.Index+1, req.TotalParts),
+			req.Size,
+		)
+		body = io.TeeReader(req.Reader, progressWriter{bar: bar})
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPut, u, body)
 	if err != nil {
+		if bar != nil {
+			bar.Fail(err)
+		}
 		return err
+	}
+	if bar != nil {
+		bar.render(true, "")
 	}
 
 	httpReq.Header.Set("Content-Length", strconv.FormatInt(req.Size, 10))
@@ -53,14 +69,24 @@ func (h *httpClient) PutPart(ctx context.Context, baseURL string, req PutPartReq
 
 	resp, err := h.c.Do(httpReq)
 	if err != nil {
+		if bar != nil {
+			bar.Fail(err)
+		}
 		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode >= http.StatusMultipleChoices {
-		return fmt.Errorf("storage PUT failed: %s", resp.Status)
+		err = fmt.Errorf("storage PUT failed: %s", resp.Status)
+		if bar != nil {
+			bar.Fail(err)
+		}
+		return err
 	}
 
+	if bar != nil {
+		bar.Finish()
+	}
 	return nil
 }
 
@@ -74,7 +100,9 @@ func (h *httpClient) GetPart(ctx context.Context, baseURL, fileID string, index 
 
 	resp, err := h.c.Do(req)
 	if err != nil {
-		resp.Body.Close()
+		if resp != nil && resp.Body != nil {
+			resp.Body.Close()
+		}
 		return nil, err
 	}
 
@@ -83,5 +111,20 @@ func (h *httpClient) GetPart(ctx context.Context, baseURL, fileID string, index 
 		return nil, fmt.Errorf("storage GET failed: %s", resp.Status)
 	}
 
-	return resp.Body, nil
+	expectedSize := resp.ContentLength
+	if expectedSize <= 0 {
+		if header := resp.Header.Get(storageproto.HeaderPartSize); header != "" {
+			if sz, parseErr := strconv.ParseInt(header, 10, 64); parseErr == nil && sz > 0 {
+				expectedSize = sz
+			}
+		}
+	}
+
+	bar := newProgressBar(
+		fmt.Sprintf("Downloading %s part %d", fileID, index),
+		expectedSize,
+	)
+	bar.render(true, "")
+
+	return newProgressReadCloser(resp.Body, bar), nil
 }
