@@ -24,8 +24,12 @@ func writeMeta(path string, fileID string, idx int, size int64, sha string, tota
 		TotalParts: total,
 		Parts:      map[int]partMeta{},
 	}
+
 	if b, err := os.ReadFile(path); err == nil {
-		_ = json.Unmarshal(b, &fm)
+		err = json.Unmarshal(b, &fm)
+		if err != nil {
+			return err
+		}
 	}
 
 	fm.Parts[idx] = partMeta{
@@ -34,7 +38,11 @@ func writeMeta(path string, fileID string, idx int, size int64, sha string, tota
 		Sha256: sha,
 	}
 
-	b, _ := json.MarshalIndent(fm, "", "  ")
+	b, err := json.MarshalIndent(fm, "", "  ")
+	if err != nil {
+		return err
+	}
+
 	return os.WriteFile(path, b, 0o644)
 }
 

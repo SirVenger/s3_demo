@@ -31,6 +31,7 @@ func NewRouter(adapter StorageAdapter) *Router {
 func (r *Router) Set(storages []string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
 	r.configured = append([]string{}, storages...)
 	r.next = 0
 }

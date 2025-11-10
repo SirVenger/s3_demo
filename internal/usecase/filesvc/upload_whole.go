@@ -122,14 +122,30 @@ func writeChunkToTemp(r io.Reader, expected int64) (*os.File, int64, string, err
 	writer := io.MultiWriter(tmp, hasher)
 	written, err := io.CopyN(writer, r, expected)
 	if err != nil {
-		tmp.Close()
-		os.Remove(tmp.Name())
+		err = tmp.Close()
+		if err != nil {
+			return nil, 0, "", err
+		}
+
+		err = os.Remove(tmp.Name())
+		if err != nil {
+			return nil, 0, "", err
+		}
+
 		return nil, written, "", err
 	}
 
 	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
-		tmp.Close()
-		os.Remove(tmp.Name())
+		err = tmp.Close()
+		if err != nil {
+			return nil, 0, "", err
+		}
+
+		err = os.Remove(tmp.Name())
+		if err != nil {
+			return nil, 0, "", err
+		}
+
 		return nil, written, "", err
 	}
 

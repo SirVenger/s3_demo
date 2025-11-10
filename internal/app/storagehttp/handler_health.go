@@ -38,5 +38,13 @@ func (a *Server) health(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(healthStats{OK: true, TotalBytes: total})
+	err = json.NewEncoder(w).Encode(healthStats{
+		OK:         true,
+		TotalBytes: total,
+	})
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }

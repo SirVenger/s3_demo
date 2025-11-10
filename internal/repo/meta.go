@@ -43,11 +43,11 @@ func (s *Store) Save(fr models.File) error {
 		fr.Parts = map[int]models.Part{}
 	}
 	s.files[fr.ID] = fr
-	return s.persist()
+	return s.Persist()
 }
 
-// persist сохраняет текущее состояние в файл.
-func (s *Store) persist() error {
+// Persist сохраняет текущее состояние в файл.
+func (s *Store) Persist() error {
 	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
 		return err
 	}
