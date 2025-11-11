@@ -54,7 +54,7 @@ diff 1GB.bin restored.bin && echo "OK"
 ```
 
 ```bash
-UPLOAD_RESP=$(curl -s -X POST \                                 
+UPLOAD_RESP=$(curl -s -X POST \
   -H 'Content-Type: application/octet-stream' \
   --upload-file 10GB.bin \
   http://localhost:8080/files)
