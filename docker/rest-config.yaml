@@ -1,5 +1,5 @@
 ﻿listen_addr: ":8080"
-meta_path: "/data/meta.db"
+meta_dsn: "postgres://storage:storage@postgres:5432/storage_lite?sslmode=disable"
 storages:
   - "http://storage1:8081"
   - "http://storage2:8081"

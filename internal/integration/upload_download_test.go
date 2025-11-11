@@ -9,9 +9,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/yourname/storage_lite/internal/app/resthttp"
-	"github.com/yourname/storage_lite/internal/app/storagehttp"
-	"github.com/yourname/storage_lite/internal/config"
+	"github.com/sir_venger/s3_lite/internal/app/resthttp"
+	"github.com/sir_venger/s3_lite/internal/app/storagehttp"
+	"github.com/sir_venger/s3_lite/internal/config"
 )
 
 func Test_UploadDownload_DistinctAndIntegrity(t *testing.T) {
@@ -21,7 +21,7 @@ func Test_UploadDownload_DistinctAndIntegrity(t *testing.T) {
 	s3 := httptest.NewServer(storagehttp.New(t.TempDir()))
 	t.Cleanup(func() { s1.Close(); s2.Close(); s3.Close() })
 
-	cfg := &config.Config{ListenAddr: ":0", MetaPath: t.TempDir() + "/meta.db", Storages: []string{s1.URL, s2.URL, s3.URL}}
+	cfg := &config.Config{ListenAddr: ":0", MetaDSN: "memory://upload-download", Storages: []string{s1.URL, s2.URL, s3.URL}}
 	h, _, err := resthttp.NewServer(cfg)
 	if err != nil {
 		t.Fatal(err)

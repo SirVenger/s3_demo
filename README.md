@@ -80,7 +80,18 @@ go test ./...
 ## Конфиг
 
 - `CONFIG_PATH` (по умолчанию `./config.yaml`)
-- ENV override: `LISTEN_ADDR`, `META_PATH`, `STORAGES`
+- ENV override: `LISTEN_ADDR`, `META_DSN`, `STORAGES`
+- Для сервиса метаданных используется только Postgres (`meta_dsn`). Для тестов/локальной отладки доступна спец-строка `memory://<name>`, которая хранит данные в памяти.
+
+## Миграции
+
+- SQL-миграции для Postgres лежат в `internal/repo/migrations` в формате `goose`.
+- Для их применения добавлена команда `cmd/migrate`:
+  ```bash
+  go run ./cmd/migrate
+  ```
+  Команда читает тот же конфиг/ENV, что и REST, и применяет миграции из embedded-ресурсов.
+- В Docker Compose миграции запускаются отдельным сервисом `migrator` до старта REST.
 
 ## Endpoints
 

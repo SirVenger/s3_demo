@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/yourname/storage_lite/internal/models"
+	"github.com/sir_venger/s3_lite/internal/models"
 )
 
 // StorageAdapter описывает источник знаний о доступности стораджей.

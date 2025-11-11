@@ -4,8 +4,8 @@ import (
 	"context"
 	"io"
 
-	"github.com/yourname/storage_lite/internal/models"
-	"github.com/yourname/storage_lite/pkg/storageclient"
+	"github.com/sir_venger/s3_lite/internal/models"
+	"github.com/sir_venger/s3_lite/pkg/storageclient"
 )
 
 type (

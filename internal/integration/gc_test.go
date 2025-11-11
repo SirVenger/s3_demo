@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	storagehttp "github.com/yourname/storage_lite/internal/app/storagehttp"
+	storagehttp "github.com/sir_venger/s3_lite/internal/app/storagehttp"
 )
 
 func Test_StorageGC_RemovesStaleDirs(t *testing.T) {

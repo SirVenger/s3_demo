@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/yourname/storage_lite/pkg/httperrors"
+	"github.com/sir_venger/s3_lite/pkg/httperrors"
 )
 
 type postFilesResp struct {

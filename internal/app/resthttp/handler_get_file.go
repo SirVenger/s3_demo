@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/yourname/storage_lite/pkg/httperrors"
+	"github.com/sir_venger/s3_lite/pkg/httperrors"
 )
 
 func (s *Server) getFile(w http.ResponseWriter, r *http.Request) {

@@ -1,15 +1,18 @@
 package resthttp
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/yourname/storage_lite/internal/config"
-	meta "github.com/yourname/storage_lite/internal/repo"
-	"github.com/yourname/storage_lite/internal/usecase/filesvc"
-	adapters "github.com/yourname/storage_lite/internal/usecase/filesvc/adapters/storage"
-	"github.com/yourname/storage_lite/pkg/storageclient"
+	"github.com/sir_venger/s3_lite/internal/config"
+	meta "github.com/sir_venger/s3_lite/internal/repo"
+	"github.com/sir_venger/s3_lite/internal/usecase/filesvc"
+	adapters "github.com/sir_venger/s3_lite/internal/usecase/filesvc/adapters/storage"
+	"github.com/sir_venger/s3_lite/pkg/storageclient"
 )
 
 const defaultFileParts = 6
@@ -45,9 +48,23 @@ func NewServer(cfg *config.Config) (http.Handler, *Server, error) {
 }
 
 func buildFileService(cfg *config.Config) (filesvc.Service, error) {
-	repo, err := meta.Open(cfg.MetaPath)
-	if err != nil {
-		return nil, err
+	var (
+		repo filesvc.MetaStorage
+		err  error
+	)
+	ctx := context.Background()
+
+	metaDSN := strings.TrimSpace(cfg.MetaDSN)
+	switch {
+	case strings.HasPrefix(metaDSN, "memory://"):
+		repo = meta.NewMemoryStore()
+	case metaDSN == "":
+		return nil, fmt.Errorf("meta_dsn is not configured")
+	default:
+		repo, err = meta.OpenPostgres(ctx, metaDSN)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	cli := storageclient.New()

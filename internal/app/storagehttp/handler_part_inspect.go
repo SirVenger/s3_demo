@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/yourname/storage_lite/pkg/storageproto"
+	"github.com/sir_venger/s3_lite/pkg/storageproto"
 )
 
 // inspectPart отвечает на HEAD-запросы метаданными по части.

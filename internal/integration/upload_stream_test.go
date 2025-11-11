@@ -7,12 +7,11 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"testing"
 
-	"github.com/yourname/storage_lite/internal/app/resthttp"
-	"github.com/yourname/storage_lite/internal/app/storagehttp"
-	"github.com/yourname/storage_lite/internal/config"
+	"github.com/sir_venger/s3_lite/internal/app/resthttp"
+	"github.com/sir_venger/s3_lite/internal/app/storagehttp"
+	"github.com/sir_venger/s3_lite/internal/config"
 )
 
 type uploadResponse struct {
@@ -31,10 +30,9 @@ func TestUploadAndStreamFile(t *testing.T) {
 	storageSrv2 := httptest.NewServer(storagehttp.New(storageDir2))
 	t.Cleanup(storageSrv2.Close)
 
-	metaPath := filepath.Join(t.TempDir(), "meta.db")
 	cfg := &config.Config{
 		ListenAddr: ":0",
-		MetaPath:   metaPath,
+		MetaDSN:    "memory://stream-test",
 		Storages:   []string{storageSrv1.URL},
 	}
 

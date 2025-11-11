@@ -6,7 +6,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/yourname/storage_lite/pkg/storageproto"
+	"github.com/sir_venger/s3_lite/pkg/storageproto"
 )
 
 // fetchPart обслуживает GET-запросы, возвращая содержимое части.

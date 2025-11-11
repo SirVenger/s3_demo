@@ -9,7 +9,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/yourname/storage_lite/pkg/storageproto"
+	"github.com/sir_venger/s3_lite/pkg/storageproto"
 )
 
 // insertPart принимает POST-запросы на запись новой части.

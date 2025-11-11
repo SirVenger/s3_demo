@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/yourname/storage_lite/internal/app/resthttp"
-	"github.com/yourname/storage_lite/internal/config"
+	"github.com/sir_venger/s3_lite/internal/app/resthttp"
+	"github.com/sir_venger/s3_lite/internal/config"
 )
 
 func main() {

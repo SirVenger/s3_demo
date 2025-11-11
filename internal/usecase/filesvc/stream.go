@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/yourname/storage_lite/internal/models"
+	"github.com/sir_venger/s3_lite/internal/models"
 )
 
 // Stream читает данные по частям из стораджей и транслирует клиенту.

@@ -1,20 +1,18 @@
 package filesvc
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"math"
-	"os"
 
 	"github.com/google/uuid"
-	"github.com/yourname/storage_lite/internal/models"
-	"github.com/yourname/storage_lite/pkg/storageclient"
+	"github.com/sir_venger/s3_lite/internal/models"
+	"github.com/sir_venger/s3_lite/pkg/storageclient"
 )
-
-const tempChunkPattern = "storage-lite-part-*"
 
 // UploadWhole читает поток постранично, делит на части и распределяет их по стораджам.
 func (s *Files) UploadWhole(ctx context.Context, r io.Reader, size int64) (models.UploadResult, error) {
@@ -42,12 +40,12 @@ func (s *Files) UploadWhole(ctx context.Context, r io.Reader, size int64) (model
 		}
 
 		partSize := min(plan.Size, remaining)
-		chunkFile, written, sha, err := writeChunkToTemp(r, partSize)
+		chunk, written, sha, err := readChunk(r, partSize)
 		if err != nil {
 			return models.UploadResult{}, err
 		}
 
-		reader := io.NewSectionReader(chunkFile, 0, written)
+		reader := bytes.NewReader(chunk)
 		req := storageclient.PutPartRequest{
 			FileID:     fileID,
 			Index:      idx,
@@ -58,17 +56,8 @@ func (s *Files) UploadWhole(ctx context.Context, r io.Reader, size int64) (model
 		}
 
 		storage := storages[idx]
-		putErr := s.StorageCli.PutPart(ctx, storage, req)
-		closeErr := chunkFile.Close()
-		removeErr := os.Remove(chunkFile.Name())
-		if putErr != nil {
-			return models.UploadResult{}, putErr
-		}
-		if closeErr != nil {
-			return models.UploadResult{}, closeErr
-		}
-		if removeErr != nil && !os.IsNotExist(removeErr) {
-			return models.UploadResult{}, removeErr
+		if err := s.StorageCli.PutPart(ctx, storage, req); err != nil {
+			return models.UploadResult{}, err
 		}
 
 		file.Parts[idx] = models.Part{
@@ -112,42 +101,25 @@ func determineParts(length int64, desired int) models.ChunkPlan {
 	}
 }
 
-func writeChunkToTemp(r io.Reader, expected int64) (*os.File, int64, string, error) {
-	tmp, err := os.CreateTemp("", tempChunkPattern)
-	if err != nil {
-		return nil, 0, "", err
+func readChunk(r io.Reader, expected int64) ([]byte, int64, string, error) {
+	if expected < 0 {
+		return nil, 0, "", fmt.Errorf("invalid chunk size: %d", expected)
 	}
 
 	hasher := sha256.New()
-	writer := io.MultiWriter(tmp, hasher)
+	var buf bytes.Buffer
+	if expected > 0 {
+		if expected > int64(int(^uint(0)>>1)) {
+			return nil, 0, "", fmt.Errorf("chunk size %d exceeds buffer limit", expected)
+		}
+		buf.Grow(int(expected))
+	}
+
+	writer := io.MultiWriter(&buf, hasher)
 	written, err := io.CopyN(writer, r, expected)
 	if err != nil {
-		err = tmp.Close()
-		if err != nil {
-			return nil, 0, "", err
-		}
-
-		err = os.Remove(tmp.Name())
-		if err != nil {
-			return nil, 0, "", err
-		}
-
 		return nil, written, "", err
 	}
 
-	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
-		err = tmp.Close()
-		if err != nil {
-			return nil, 0, "", err
-		}
-
-		err = os.Remove(tmp.Name())
-		if err != nil {
-			return nil, 0, "", err
-		}
-
-		return nil, written, "", err
-	}
-
-	return tmp, written, hex.EncodeToString(hasher.Sum(nil)), nil
+	return buf.Bytes(), written, hex.EncodeToString(hasher.Sum(nil)), nil
 }

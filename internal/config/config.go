@@ -9,7 +9,7 @@ import (
 
 type Config struct {
 	ListenAddr string   `yaml:"listen_addr" json:"listen_addr"`
-	MetaPath   string   `yaml:"meta_path" json:"meta_path"`
+	MetaDSN    string   `yaml:"meta_dsn" json:"meta_dsn"`
 	Storages   []string `yaml:"storages" json:"storages"`
 }
 
@@ -30,8 +30,8 @@ func Load() (*Config, error) {
 	if v := os.Getenv("LISTEN_ADDR"); v != "" {
 		c.ListenAddr = v
 	}
-	if v := os.Getenv("META_PATH"); v != "" {
-		c.MetaPath = v
+	if v := os.Getenv("META_DSN"); v != "" {
+		c.MetaDSN = v
 	}
 	if v := os.Getenv("STORAGES"); v != "" {
 		c.Storages = splitComma(v)
