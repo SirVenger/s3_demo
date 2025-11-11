@@ -3,8 +3,9 @@ package resthttp
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
-	"github.com/yourname/storage_lite/pkg/httperrors"
+	"github.com/sir_venger/s3_lite/pkg/httperrors"
 )
 
 type postFilesResp struct {
@@ -14,7 +15,9 @@ type postFilesResp struct {
 }
 
 func (s *Server) postFiles(w http.ResponseWriter, r *http.Request) {
-	res, err := s.FilesService.UploadWhole(r.Context(), r.Body, r.ContentLength)
+	filename := extractFileName(r)
+
+	res, err := s.FilesService.UploadWhole(r.Context(), r.Body, r.ContentLength, filename)
 	if err != nil {
 		httperrors.Write(w, err)
 		return
@@ -25,4 +28,17 @@ func (s *Server) postFiles(w http.ResponseWriter, r *http.Request) {
 		Size:   res.Size,
 		Parts:  res.Parts,
 	})
+}
+
+func extractFileName(r *http.Request) string {
+	if v := strings.TrimSpace(r.Header.Get("X-File-Name")); v != "" {
+		return v
+	}
+	if v := strings.TrimSpace(r.Header.Get("X-Filename")); v != "" {
+		return v
+	}
+	if v := strings.TrimSpace(r.URL.Query().Get("filename")); v != "" {
+		return v
+	}
+	return ""
 }

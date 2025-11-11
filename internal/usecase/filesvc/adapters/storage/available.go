@@ -12,19 +12,19 @@ import (
 
 var healthHTTPClient = &http.Client{Timeout: 2 * time.Second}
 
-// HealthAdapter определяет готовность стораджей по их health-эндпоинтам.
+// HealthAdapter определяет готовность стораджей по их health-эндпоинтам
 type HealthAdapter struct {
 	MaxStorageLoadBytes int64
 }
 
-// NewHealthAdapter инициализирует адаптер доступности.
+// NewHealthAdapter инициализирует адаптер доступности
 func NewHealthAdapter(maxLoad int64) *HealthAdapter {
 	return &HealthAdapter{
 		MaxStorageLoadBytes: maxLoad,
 	}
 }
 
-// Available возвращает отсортированный список готовых стораджей.
+// Available возвращает отсортированный список готовых стораджей
 func (a *HealthAdapter) Available(ctx context.Context, storages []string) []string {
 	if len(storages) == 0 {
 		return nil

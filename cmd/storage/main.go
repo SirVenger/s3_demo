@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/yourname/storage_lite/internal/app/storagehttp"
+	"github.com/sir_venger/s3_lite/internal/app/storagehttp"
 )
 
 const (

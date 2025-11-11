@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/yourname/storage_lite/internal/models"
+	"github.com/sir_venger/s3_lite/internal/models"
 )
 
 func Write(w http.ResponseWriter, err error) {

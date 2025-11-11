@@ -7,17 +7,15 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"os"
+	"strings"
 
 	"github.com/google/uuid"
-	"github.com/yourname/storage_lite/internal/models"
-	"github.com/yourname/storage_lite/pkg/storageclient"
+	"github.com/sir_venger/s3_lite/internal/models"
+	"github.com/sir_venger/s3_lite/pkg/storageclient"
 )
 
-const tempChunkPattern = "storage-lite-part-*"
-
 // UploadWhole читает поток постранично, делит на части и распределяет их по стораджам.
-func (s *Files) UploadWhole(ctx context.Context, r io.Reader, size int64) (models.UploadResult, error) {
+func (s *Files) UploadWhole(ctx context.Context, r io.Reader, size int64, name string) (models.UploadResult, error) {
 	if size < 0 {
 		return models.UploadResult{}, fmt.Errorf("content length is required")
 	}
@@ -31,6 +29,8 @@ func (s *Files) UploadWhole(ctx context.Context, r io.Reader, size int64) (model
 	fileID := uuid.NewString()
 	file := models.File{
 		ID:         fileID,
+		Name:       strings.TrimSpace(name),
+		Size:       size,
 		TotalParts: plan.Total,
 		Parts:      make(map[int]models.Part, plan.Total),
 	}
@@ -42,35 +42,27 @@ func (s *Files) UploadWhole(ctx context.Context, r io.Reader, size int64) (model
 		}
 
 		partSize := min(plan.Size, remaining)
-		chunkFile, written, sha, err := writeChunkToTemp(r, partSize)
-		if err != nil {
-			return models.UploadResult{}, err
-		}
-
-		reader := io.NewSectionReader(chunkFile, 0, written)
+		limited := &io.LimitedReader{R: r, N: partSize}
+		hasher := sha256.New()
+		reader := io.TeeReader(limited, hasher)
 		req := storageclient.PutPartRequest{
 			FileID:     fileID,
 			Index:      idx,
 			Reader:     reader,
-			Size:       written,
-			Sha256:     sha,
+			Size:       partSize,
 			TotalParts: plan.Total,
 		}
 
 		storage := storages[idx]
-		putErr := s.StorageCli.PutPart(ctx, storage, req)
-		closeErr := chunkFile.Close()
-		removeErr := os.Remove(chunkFile.Name())
-		if putErr != nil {
-			return models.UploadResult{}, putErr
-		}
-		if closeErr != nil {
-			return models.UploadResult{}, closeErr
-		}
-		if removeErr != nil && !os.IsNotExist(removeErr) {
-			return models.UploadResult{}, removeErr
+		if err = s.StorageCli.PutPart(ctx, storage, req); err != nil {
+			return models.UploadResult{}, err
 		}
 
+		written := partSize - limited.N
+		if written != partSize {
+			return models.UploadResult{}, fmt.Errorf("unexpected part length: want %d, got %d", partSize, written)
+		}
+		sha := hex.EncodeToString(hasher.Sum(nil))
 		file.Parts[idx] = models.Part{
 			Index:   idx,
 			Size:    written,
@@ -85,7 +77,7 @@ func (s *Files) UploadWhole(ctx context.Context, r io.Reader, size int64) (model
 		return models.UploadResult{}, fmt.Errorf("incomplete upload: %d bytes left", remaining)
 	}
 
-	if err := s.MetaStorage.Save(file); err != nil {
+	if err = s.MetaStorage.Save(ctx, file); err != nil {
 		return models.UploadResult{}, err
 	}
 
@@ -110,44 +102,4 @@ func determineParts(length int64, desired int) models.ChunkPlan {
 		Total: desired,
 		Size:  chunkSize,
 	}
-}
-
-func writeChunkToTemp(r io.Reader, expected int64) (*os.File, int64, string, error) {
-	tmp, err := os.CreateTemp("", tempChunkPattern)
-	if err != nil {
-		return nil, 0, "", err
-	}
-
-	hasher := sha256.New()
-	writer := io.MultiWriter(tmp, hasher)
-	written, err := io.CopyN(writer, r, expected)
-	if err != nil {
-		err = tmp.Close()
-		if err != nil {
-			return nil, 0, "", err
-		}
-
-		err = os.Remove(tmp.Name())
-		if err != nil {
-			return nil, 0, "", err
-		}
-
-		return nil, written, "", err
-	}
-
-	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
-		err = tmp.Close()
-		if err != nil {
-			return nil, 0, "", err
-		}
-
-		err = os.Remove(tmp.Name())
-		if err != nil {
-			return nil, 0, "", err
-		}
-
-		return nil, written, "", err
-	}
-
-	return tmp, written, hex.EncodeToString(hasher.Sum(nil)), nil
 }

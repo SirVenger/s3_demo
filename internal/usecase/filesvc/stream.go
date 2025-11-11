@@ -4,12 +4,12 @@ import (
 	"context"
 	"io"
 
-	"github.com/yourname/storage_lite/internal/models"
+	"github.com/sir_venger/s3_lite/internal/models"
 )
 
 // Stream читает данные по частям из стораджей и транслирует клиенту.
 func (s *Files) Stream(ctx context.Context, fileID string, w io.Writer) error {
-	file, err := s.MetaStorage.Get(fileID)
+	file, err := s.MetaStorage.Get(ctx, fileID)
 	if err != nil {
 		return err
 	}

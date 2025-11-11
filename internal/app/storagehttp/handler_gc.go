@@ -12,7 +12,7 @@ const manualGCTTL = 24 * time.Hour
 
 // gcOnce вручную запускает сбор старых незавершённых директорий.
 func (a *Server) gcOnce(w http.ResponseWriter, _ *http.Request) {
-	_ = sweepOnce(a.dataDir, manualGCTTL)
+	_ = SweepOnce(a.dataDir, manualGCTTL)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -29,7 +29,7 @@ func StartGC(root string, ttl time.Duration, every time.Duration) func() {
 		for {
 			select {
 			case <-ticker.C:
-				_ = sweepOnce(root, ttl)
+				_ = SweepOnce(root, ttl)
 			case <-stop:
 				ticker.Stop()
 				return
@@ -44,8 +44,8 @@ func StartGC(root string, ttl time.Duration, every time.Duration) func() {
 	}
 }
 
-// sweepOnce удаляет каталоги, у которых meta.json устарел и содержит неполные данные
-func sweepOnce(root string, ttl time.Duration) error {
+// SweepOnce удаляет каталоги, у которых meta.json устарел и содержит неполные данные
+func SweepOnce(root string, ttl time.Duration) error {
 	now := time.Now()
 	entries, err := os.ReadDir(root)
 	if err != nil {

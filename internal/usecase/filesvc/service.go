@@ -4,20 +4,20 @@ import (
 	"context"
 	"io"
 
-	"github.com/yourname/storage_lite/internal/models"
-	"github.com/yourname/storage_lite/pkg/storageclient"
+	"github.com/sir_venger/s3_lite/internal/models"
+	"github.com/sir_venger/s3_lite/pkg/storageclient"
 )
 
 type (
 	// MetaStorage хранилище мета данных файлов
 	MetaStorage interface {
-		Get(id string) (models.File, error)
-		Save(file models.File) error
+		Get(ctx context.Context, id string) (models.File, error)
+		Save(ctx context.Context, file models.File) error
 	}
 
 	// Service объединяет операции по загрузке и выдаче файлов.
 	Service interface {
-		UploadWhole(ctx context.Context, r io.Reader, size int64) (models.UploadResult, error)
+		UploadWhole(ctx context.Context, r io.Reader, size int64, name string) (models.UploadResult, error)
 		Stream(ctx context.Context, fileID string, w io.Writer) error
 		AddStorages(storages ...string)
 	}

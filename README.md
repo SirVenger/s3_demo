@@ -80,7 +80,21 @@ go test ./...
 ## Конфиг
 
 - `CONFIG_PATH` (по умолчанию `./config.yaml`)
-- ENV override: `LISTEN_ADDR`, `META_PATH`, `STORAGES`
+- ENV override: `LISTEN_ADDR`, `META_DSN`, `STORAGES`
+- Для сервиса метаданных используется только Postgres (`meta_dsn`). Для тестов/локальной отладки доступна спец-строка `memory://<name>`, которая хранит данные в памяти.
+
+## Миграции
+
+- Если нужен «чистый» goose CLI (например, в CI/CD), установите его и выполните миграции вручную:
+- ```bash
+  go install github.com/pressly/goose/v3/cmd/goose@v3.19.0
+  ```
+- ```bash
+  export META_DSN="postgres://storage:storage@localhost:5432/storage_lite?sslmode=disable"
+  goose -dir internal/repo/migrations postgres "$META_DSN" up
+  ```
+  Можно указать `down`, `status` и другие команды goose при необходимости.
+- В Docker Compose миграции запускаются отдельным сервисом `migrator` до старта REST.
 
 ## Endpoints
 

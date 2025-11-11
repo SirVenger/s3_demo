@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/yourname/storage_lite/internal/models"
+	"github.com/sir_venger/s3_lite/internal/models"
 )
 
 // StorageAdapter описывает источник знаний о доступности стораджей.
@@ -64,7 +64,7 @@ func (r *Router) Add(storages ...string) {
 	}
 }
 
-// Allocate возвращает список стораджей длиной count.
+// Allocate возвращает список стораджей длиной count
 func (r *Router) Allocate(ctx context.Context, count int) ([]string, error) {
 	if count <= 0 {
 		return nil, fmt.Errorf("count must be positive")

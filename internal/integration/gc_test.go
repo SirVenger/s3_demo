@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	storagehttp "github.com/yourname/storage_lite/internal/app/storagehttp"
+	"github.com/sir_venger/s3_lite/internal/app/storagehttp"
 )
 
 func Test_StorageGC_RemovesStaleDirs(t *testing.T) {
@@ -27,13 +27,10 @@ func Test_StorageGC_RemovesStaleDirs(t *testing.T) {
 	_ = os.Chtimes(filepath.Join(d, "meta.json"), old, old)
 
 	// однократный запуск sweep (ttl 24h)
-	if err := storagehttpTestSweepOnce(root, 24*time.Hour); err != nil {
+	if err := storagehttp.SweepOnce(root, 24*time.Hour); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(d); !os.IsNotExist(err) {
 		t.Fatalf("stale dir not removed")
 	}
 }
-
-// storagehttp.sweepOnce неэкспортируемая, сделаем тонкий враппер в тесте
-func storagehttpTestSweepOnce(root string, ttl time.Duration) error { return callSweepOnce(root, ttl) }

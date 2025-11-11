@@ -1,5 +1,20 @@
 ﻿version: "3.9"
 services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: storage_lite
+      POSTGRES_USER: storage
+      POSTGRES_PASSWORD: storage
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U storage -d storage_lite"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
   rest:
     build:
       context: ..
@@ -11,12 +26,20 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - storage1
-      - storage2
-      - storage3
-      - storage4
-      - storage5
-      - storage6
+      postgres:
+        condition: service_healthy
+      storage1:
+        condition: service_started
+      storage2:
+        condition: service_started
+      storage3:
+        condition: service_started
+      storage4:
+        condition: service_started
+      storage5:
+        condition: service_started
+      storage6:
+        condition: service_started
   storage1:
     build:
       context: ..
@@ -84,4 +107,5 @@ volumes:
   storage4: {}
   storage5: {}
   storage6: {}
+  postgres-data: {}
 

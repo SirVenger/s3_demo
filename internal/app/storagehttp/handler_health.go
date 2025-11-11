@@ -21,14 +21,17 @@ func (a *Server) health(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
+
 		if d.IsDir() {
 			return nil
 		}
+
 		info, err := d.Info()
 		if err != nil {
 			return err
 		}
 		total += info.Size()
+
 		return nil
 	})
 
