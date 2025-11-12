@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -37,7 +38,6 @@ func (s *Files) UploadWhole(ctx context.Context, r io.Reader, size int64, name s
 		Parts:      make(map[int]models.Part, plan.Total),
 	}
 
-	// Параллелизм отправки
 	sem := make(chan struct{}, plan.Total)
 
 	eg, egCtx := errgroup.WithContext(ctx)
@@ -45,7 +45,7 @@ func (s *Files) UploadWhole(ctx context.Context, r io.Reader, size int64, name s
 
 	remaining := size
 	for idx := 0; idx < plan.Total; idx++ {
-		if err := egCtx.Err(); err != nil {
+		if err = egCtx.Err(); err != nil {
 			return models.UploadResult{}, err
 		}
 
@@ -72,7 +72,7 @@ func (s *Files) UploadWhole(ctx context.Context, r io.Reader, size int64, name s
 					Size:       expected,
 					TotalParts: plan.Total,
 				}
-				if err := s.StorageCli.PutPart(egCtx, st, req); err != nil {
+				if err = s.StorageCli.PutPart(egCtx, st, req); err != nil {
 					return err
 				}
 				return nil
@@ -84,17 +84,16 @@ func (s *Files) UploadWhole(ctx context.Context, r io.Reader, size int64, name s
 		hasher := sha256.New()
 		limited := &io.LimitedReader{R: r, N: partSize}
 		tee := io.TeeReader(limited, hasher)
-
-		// copyErr повлияет и на закрытие пайпа
 		n, copyErr := io.Copy(pw, tee)
 		closeErr := pw.CloseWithError(copyErr) // проброс для воркера
 
 		if copyErr != nil {
-			// Отменим группу и дождёмся остановки
 			_ = eg.Wait()
-			if copyErr == io.ErrClosedPipe && egCtx.Err() != nil {
+
+			if errors.Is(copyErr, io.ErrClosedPipe) && egCtx.Err() != nil {
 				return models.UploadResult{}, egCtx.Err()
 			}
+
 			return models.UploadResult{}, copyErr
 		}
 		if closeErr != nil {
@@ -107,6 +106,7 @@ func (s *Files) UploadWhole(ctx context.Context, r io.Reader, size int64, name s
 		}
 
 		sha := hex.EncodeToString(hasher.Sum(nil))
+
 		mu.Lock()
 		file.Parts[idx] = models.Part{
 			Index:   idx,
@@ -119,14 +119,14 @@ func (s *Files) UploadWhole(ctx context.Context, r io.Reader, size int64, name s
 		remaining -= n
 	}
 
-	if err := eg.Wait(); err != nil {
+	if err = eg.Wait(); err != nil {
 		return models.UploadResult{}, err
 	}
 	if remaining != 0 {
 		return models.UploadResult{}, fmt.Errorf("incomplete upload: %d bytes left", remaining)
 	}
 
-	if err := s.MetaStorage.Save(ctx, file); err != nil {
+	if err = s.MetaStorage.Save(ctx, file); err != nil {
 		return models.UploadResult{}, err
 	}
 

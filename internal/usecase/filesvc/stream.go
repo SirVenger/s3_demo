@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 
-	"github.com/sir_venger/s3_lite/internal/models"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -15,27 +14,13 @@ func (s *Files) Stream(ctx context.Context, fileID string, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if file.TotalParts == 0 {
-		return nil
-	}
-
-	// Быстрый чек на «дырки»
-	for i := 0; i < file.TotalParts; i++ {
-		if _, ok := file.Parts[i]; !ok {
-			return models.ErrIncomplete
-		}
-	}
 
 	streamCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// errgroup с отменяемым контекстом
 	eg, egCtx := errgroup.WithContext(streamCtx)
-
-	// Семафор конкуренции
 	sem := make(chan struct{}, file.TotalParts)
 
-	// Для каждого индекса — свой pipe
 	type pipePair struct {
 		r *io.PipeReader
 	}
@@ -58,10 +43,10 @@ func (s *Files) Stream(ctx context.Context, fileID string, w io.Writer) error {
 			}
 			defer func() { <-sem }()
 
-			rc, err := s.StorageCli.GetPart(egCtx, part.Storage, file.ID, idx)
-			if err != nil {
-				_ = pw.CloseWithError(err)
-				return err
+			rc, errPart := s.StorageCli.GetPart(egCtx, part.Storage, file.ID, idx)
+			if errPart != nil {
+				_ = pw.CloseWithError(errPart)
+				return errPart
 			}
 			defer rc.Close()
 
@@ -80,6 +65,7 @@ func (s *Files) Stream(ctx context.Context, fileID string, w io.Writer) error {
 	// Писатель: читает pipe'ы строго по порядку и пишет в w.
 	for idx := 0; idx < file.TotalParts; idx++ {
 		reader := pipes[idx].r
+
 		if _, err = io.Copy(w, reader); err != nil {
 			cancel()
 			_ = reader.CloseWithError(err)
