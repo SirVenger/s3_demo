@@ -26,8 +26,11 @@ func (s *Files) Stream(ctx context.Context, fileID string, w io.Writer) error {
 		}
 	}
 
+	streamCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	// errgroup с отменяемым контекстом
-	eg, egCtx := errgroup.WithContext(ctx)
+	eg, egCtx := errgroup.WithContext(streamCtx)
 
 	// Семафор конкуренции
 	sem := make(chan struct{}, file.TotalParts)
@@ -35,7 +38,6 @@ func (s *Files) Stream(ctx context.Context, fileID string, w io.Writer) error {
 	// Для каждого индекса — свой pipe
 	type pipePair struct {
 		r *io.PipeReader
-		w *io.PipeWriter
 	}
 	pipes := make([]pipePair, file.TotalParts)
 
@@ -45,13 +47,13 @@ func (s *Files) Stream(ctx context.Context, fileID string, w io.Writer) error {
 		part := file.Parts[idx]
 
 		pr, pw := io.Pipe()
-		pipes[idx] = pipePair{r: pr, w: pw}
+		pipes[idx] = pipePair{r: pr}
 
 		eg.Go(func() error {
 			select {
 			case sem <- struct{}{}:
 			case <-egCtx.Done():
-				pw.CloseWithError(egCtx.Err())
+				_ = pw.CloseWithError(egCtx.Err())
 				return egCtx.Err()
 			}
 			defer func() { <-sem }()
@@ -59,34 +61,49 @@ func (s *Files) Stream(ctx context.Context, fileID string, w io.Writer) error {
 			rc, err := s.StorageCli.GetPart(egCtx, part.Storage, file.ID, idx)
 			if err != nil {
 				_ = pw.CloseWithError(err)
-				return nil
+				return err
 			}
+			defer rc.Close()
 
-			// ВНИМАНИЕ: закрываем rc после копирования
 			_, copyErr := io.Copy(pw, rc)
-			_ = rc.Close()
-			_ = pw.CloseWithError(copyErr) // пробрасываем ошибку (или nil) на читательский конец
+			closeErr := pw.CloseWithError(copyErr)
+			if copyErr != nil {
+				return copyErr
+			}
+			if closeErr != nil {
+				return closeErr
+			}
 			return nil
 		})
 	}
 
 	// Писатель: читает pipe'ы строго по порядку и пишет в w.
 	for idx := 0; idx < file.TotalParts; idx++ {
-		if _, err = io.Copy(w, pipes[idx].r); err != nil {
-			_ = pipes[idx].r.CloseWithError(err)
-
+		reader := pipes[idx].r
+		if _, err = io.Copy(w, reader); err != nil {
+			cancel()
+			_ = reader.CloseWithError(err)
 			for j := idx + 1; j < file.TotalParts; j++ {
-				err = pipes[j].r.Close()
-				if err != nil {
-					return err
-				}
+				_ = pipes[j].r.CloseWithError(err)
 			}
 
-			return eg.Wait()
+			waitErr := eg.Wait()
+			if waitErr != nil && !errors.Is(waitErr, context.Canceled) {
+				return waitErr
+			}
+			return err
 		}
 
-		err = pipes[idx].r.Close()
-		if err != nil {
+		if err = reader.Close(); err != nil {
+			cancel()
+			for j := idx + 1; j < file.TotalParts; j++ {
+				_ = pipes[j].r.CloseWithError(err)
+			}
+
+			waitErr := eg.Wait()
+			if waitErr != nil && !errors.Is(waitErr, context.Canceled) {
+				return waitErr
+			}
 			return err
 		}
 	}

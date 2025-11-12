@@ -74,7 +74,6 @@ func (h *httpClient) GetPart(ctx context.Context, baseURL, fileID string, index 
 
 	resp, err := h.c.Do(req)
 	if err != nil {
-		resp.Body.Close()
 		return nil, err
 	}
 

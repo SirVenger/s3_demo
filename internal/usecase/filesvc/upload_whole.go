@@ -147,8 +147,13 @@ func determineParts(length int64, desired int) models.ChunkPlan {
 		chunkSize = 1
 	}
 
+	totalParts := int((length + chunkSize - 1) / chunkSize)
+	if totalParts <= 0 {
+		totalParts = 1
+	}
+
 	return models.ChunkPlan{
-		Total: desired,
+		Total: totalParts,
 		Size:  chunkSize,
 	}
 }
