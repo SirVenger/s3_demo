@@ -17,7 +17,7 @@ import (
 )
 
 // UploadWhole читает поток постранично, делит на части и распределяет их по стораджам.
-func (s *Files) UploadWhole(ctx context.Context, r io.Reader, size int64, name string) (models.UploadResult, error) {
+func (s *Files) UploadWhole(ctx context.Context, src io.Reader, size int64, name string) (models.UploadResult, error) {
 	if size < 0 {
 		// Контент без Content-Length не можем разбить на части заранее.
 		return models.UploadResult{}, fmt.Errorf("content length is required")
@@ -42,91 +42,96 @@ func (s *Files) UploadWhole(ctx context.Context, r io.Reader, size int64, name s
 	}
 
 	// Ограничиваем число одновременных воркеров количеством частей.
-	sem := make(chan struct{}, plan.Total)
+	workerSlots := make(chan struct{}, plan.Total)
 
 	// errgroup спрячет синхронизацию и позволит отменять пайплайн целиком.
-	eg, egCtx := errgroup.WithContext(ctx)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	group, groupCtx := errgroup.WithContext(ctx)
+	fail := func(err error) (models.UploadResult, error) {
+		cancel()
+		_ = group.Wait()
+		if err == io.ErrClosedPipe && groupCtx.Err() != nil {
+			return models.UploadResult{}, groupCtx.Err()
+		}
+		return models.UploadResult{}, err
+	}
 	var mu sync.Mutex
 
 	// remaining отслеживает, сколько байт ещё нужно прочитать из r.
 	remaining := size
 	// Бежим по индексам частей и для каждой поднимаем пайп и воркер.
-	for idx := 0; idx < plan.Total; idx++ {
-		if err := egCtx.Err(); err != nil {
+	for partIdx := 0; partIdx < plan.Total; partIdx++ {
+		if err := groupCtx.Err(); err != nil {
 			// Если контекст уже отменён, прекращаем чтение новых частей.
-			return models.UploadResult{}, err
+			return fail(err)
 		}
 
 		// Последняя часть может быть меньше планового размера, поэтому ограничиваем остатком.
 		partSize := min(plan.Size, remaining)
 		// Pipe даёт поток между продюсером, читающим клиентский upload, и воркером.
-		pr, pw := io.Pipe()
+		partReader, partWriter := io.Pipe()
 
 		// Блокируемся до освобождения семафора или выходим, если контекст отменён.
 		select {
-		case sem <- struct{}{}:
-		case <-egCtx.Done():
-			_ = pw.CloseWithError(egCtx.Err())
-			return models.UploadResult{}, egCtx.Err()
+		case workerSlots <- struct{}{}:
+		case <-groupCtx.Done():
+			_ = partWriter.CloseWithError(groupCtx.Err())
+			return fail(groupCtx.Err())
 		}
 
 		// Воркера запускаем сразу: он будет читать из пайпа и заливать часть.
-		storage := storages[idx]
-		eg.Go(func(i int, rd *io.PipeReader, st string, expected int64) func() error {
+		storageURL := storages[partIdx]
+		group.Go(func(index int, rd *io.PipeReader, base string, expected int64) func() error {
 			return func() error {
-				defer func() { <-sem }()
+				defer func() { <-workerSlots }()
 				defer rd.Close()
 				req := storageclient.PutPartRequest{
 					FileID:     fileID,
-					Index:      i,
+					Index:      index,
 					Reader:     rd,
 					Size:       expected,
 					TotalParts: plan.Total,
 				}
-				if err := s.StorageCli.PutPart(egCtx, st, req); err != nil {
+				if err := s.StorageCli.PutPart(groupCtx, base, req); err != nil {
+					cancel()
 					return err
 				}
 				return nil
 			}
-		}(idx, pr, storage, partSize))
+		}(partIdx, partReader, storageURL, partSize))
 
 		// Продюсер: читаем кусок из входного r и пишем в PipeWriter,
 		// одновременно считаем SHA-256 без дополнительного буфера.
 		hasher := sha256.New()
-		limited := &io.LimitedReader{R: r, N: partSize}
-		tee := io.TeeReader(limited, hasher)
+		limitedSrc := &io.LimitedReader{R: src, N: partSize}
+		hashedStream := io.TeeReader(limitedSrc, hasher)
 
 		// copyErr повлияет и на закрытие пайпа
-		n, copyErr := io.Copy(pw, tee)
-		closeErr := pw.CloseWithError(copyErr) // проброс для воркера
+		written, copyErr := io.Copy(partWriter, hashedStream)
+		closeErr := partWriter.CloseWithError(copyErr) // проброс для воркера
 
 		if copyErr != nil {
 			// Отменим группу и дождёмся остановки
-			_ = eg.Wait()
-			if copyErr == io.ErrClosedPipe && egCtx.Err() != nil {
-				return models.UploadResult{}, egCtx.Err()
-			}
-			return models.UploadResult{}, copyErr
+			return fail(copyErr)
 		}
 		if closeErr != nil {
-			_ = eg.Wait()
-			return models.UploadResult{}, closeErr
+			return fail(closeErr)
 		}
-		if n != partSize {
+		if written != partSize {
 			// Поток закончился раньше — сигнализируем об ошибке, чтобы клиент перезалил файл.
-			_ = eg.Wait()
-			return models.UploadResult{}, fmt.Errorf("unexpected part length: want %d, got %d", partSize, n)
+			return fail(fmt.Errorf("unexpected part length: want %d, got %d", partSize, written))
 		}
 
 		// Храним хеш части для последующей валидации при сборке.
 		sha := hex.EncodeToString(hasher.Sum(nil))
 		// Пишем часть в карту потокобезопасно, чтобы не гоняться за race.
 		mu.Lock()
-		file.Parts[idx] = models.Part{
-			Index:   idx,
-			Size:    n,
+		file.Parts[partIdx] = models.Part{
+			Index:   partIdx,
+			Size:    written,
 			Sha256:  sha,
-			Storage: storage,
+			Storage: storageURL,
 		}
 		mu.Unlock()
 
@@ -135,7 +140,7 @@ func (s *Files) UploadWhole(ctx context.Context, r io.Reader, size int64, name s
 	}
 
 	// Убедимся, что все воркеры завершились без ошибок.
-	if err := eg.Wait(); err != nil {
+	if err := group.Wait(); err != nil {
 		return models.UploadResult{}, err
 	}
 	// Если осталось что-то непрочитанным — значит поток закончился раньше ожидаемого.
