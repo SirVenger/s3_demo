@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// partRequest содержит все вычисленные пути до части и её метаданных.
 type partRequest struct {
 	fileID string
 	idx    int
@@ -17,6 +18,7 @@ type partRequest struct {
 	meta   string
 }
 
+// requirePartRequest валидирует path-параметры и возвращает заполненную структуру.
 func (a *Server) requirePartRequest(w http.ResponseWriter, r *http.Request) (*partRequest, bool) {
 	req, err := newPartRequest(a.dataDir, r)
 	if err != nil {
@@ -27,13 +29,16 @@ func (a *Server) requirePartRequest(w http.ResponseWriter, r *http.Request) (*pa
 	return req, true
 }
 
+// newPartRequest парсит идентификаторы из URL и рассчитывает пути на диске.
 func newPartRequest(root string, r *http.Request) (*partRequest, error) {
+	// fileID/idx берутся напрямую из path-параметров Chi.
 	fileID := chi.URLParam(r, "fileID")
 	idxStr := chi.URLParam(r, "idx")
 	if fileID == "" || idxStr == "" {
 		return nil, fmt.Errorf("invalid path")
 	}
 
+	// Индекс части приходит в десятиричном виде, отрицательные значения запрещены.
 	idx, err := strconv.Atoi(idxStr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid part index: %w", err)
@@ -42,6 +47,7 @@ func newPartRequest(root string, r *http.Request) (*partRequest, error) {
 		return nil, fmt.Errorf("invalid part index: must be non-negative")
 	}
 
+	// Каждому файлу соответствует собственная директория в dataDir.
 	dir := filepath.Join(root, fileID)
 
 	return &partRequest{

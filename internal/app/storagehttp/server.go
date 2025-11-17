@@ -25,13 +25,15 @@ func (a *Server) routes() http.Handler {
 	r := chi.NewRouter()
 
 	r.Route("/parts/{fileID}/{idx}", func(pr chi.Router) {
-		// Accept both PUT and POST to stay compatible with the documented API and older clients.
+		// Эндпоинты Storage API для загрузки, чтения и инспекции конкретной части.
 		pr.Put("/", a.insertPart)
 		pr.Get("/", a.fetchPart)
 		pr.Head("/", a.inspectPart)
 	})
 
+	// health нужен REST-сервису, чтобы проверять состояние стораджа.
 	r.Get("/health", a.health)
+	// /admin/gc позволяет вручную очистить зависшие директории.
 	r.HandleFunc("/admin/gc", a.gcOnce)
 
 	return r

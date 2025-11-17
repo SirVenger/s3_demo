@@ -75,11 +75,14 @@ func (r *Router) Allocate(ctx context.Context, count int) ([]string, error) {
 		r.mu.Unlock()
 		return nil, fmt.Errorf("no storages configured")
 	}
+	// Работаем со снимком, чтобы долго не держать мьютекс.
 	snapshot := append([]string{}, r.configured...)
 	r.mu.Unlock()
 
+	// Пытаемся отфильтровать недоступные стораджи через адаптер здоровья.
 	available := r.StorageAdapter.Available(ctx, snapshot)
 	if len(available) == 0 {
+		// Если адаптер никого не подтвердил, используем исходный список.
 		available = snapshot
 	}
 
@@ -92,6 +95,7 @@ func (r *Router) Allocate(ctx context.Context, count int) ([]string, error) {
 	r.next = (start + count) % len(available)
 	r.mu.Unlock()
 
+	// Раздаём сториджи по кругу, чтобы балансировать нагрузку.
 	result := make([]string, count)
 	for i := 0; i < count; i++ {
 		result[i] = available[(start+i)%len(available)]

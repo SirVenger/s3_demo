@@ -18,7 +18,7 @@ func (s *PGStore) Get(ctx context.Context, id string) (models.File, error) {
 		return models.File{}, fmt.Errorf("file id is empty")
 	}
 
-	// COALESCE(parts, '{}') — чтобы гарантированно получить валидный JSON для Unmarshal, это для себя комментарий
+	// COALESCE(parts, '{}') гарантирует, что JSON всегда валиден и мы не свалимся на nil.
 	sqlStr, args, err := sq.StatementBuilder.PlaceholderFormat(sq.Dollar).
 		Select(
 			"file_name",
@@ -53,6 +53,7 @@ func (s *PGStore) Get(ctx context.Context, id string) (models.File, error) {
 		return models.File{}, fmt.Errorf("unmarshal parts: %w", err)
 	}
 	if parts == nil {
+		// В базе может лежать NULL; превращаем это в пустую карту, чтобы код выше не паниковал.
 		parts = make(map[int]models.Part)
 	}
 

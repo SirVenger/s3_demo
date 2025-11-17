@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 )
 
+// healthStats — payload ответа /health.
 type healthStats struct {
 	OK         bool  `json:"ok"`
 	FreeBytes  int64 `json:"free_bytes"`
@@ -17,6 +18,7 @@ type healthStats struct {
 // health возвращает агрегированную статистику по данным стоража.
 func (a *Server) health(w http.ResponseWriter, r *http.Request) {
 	var total int64
+	// Проходим по всем файлам в dataDir и суммируем их размер для простого capacity-метрика.
 	err := filepath.WalkDir(a.dataDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -40,6 +42,7 @@ func (a *Server) health(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// У стораджа нет сложных метрик, поэтому отдаём только total и флаг OK.
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(healthStats{
 		OK:         true,

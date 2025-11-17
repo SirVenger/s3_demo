@@ -14,18 +14,21 @@ func (a *Server) inspectPart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// meta.json хранит агрегированные сведения по всем частям файла.
 	meta, err := readMeta(req.meta)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
 
+	// Проверяем, что запрошенный индекс уже записан.
 	part, ok := meta.Parts[req.idx]
 	if !ok {
 		http.NotFound(w, r)
 		return
 	}
 
+	// HEAD не возвращает тело, только заголовки с полезной нагрузкой.
 	w.Header().Set(storageproto.HeaderPartSize, strconv.FormatInt(part.Size, 10))
 	w.Header().Set(storageproto.HeaderChecksum, part.Sha256)
 	w.WriteHeader(http.StatusOK)

@@ -17,16 +17,18 @@ import (
 
 const defaultFileParts = 6
 
+// Server инкапсулирует HTTP-endpoints и зависимости файлового сервиса.
 type Server struct {
 	FilesService filesvc.Service
 	Cfg          *config.Config
 }
 
+// addStoragesRequest описывает payload для динамического добавления стораджей.
 type addStoragesRequest struct {
 	Storages []string `json:"storages"`
 }
 
-// NewServer конструктор
+// NewServer поднимает HTTP-роутер и подготавливает все зависимости.
 func NewServer(cfg *config.Config) (http.Handler, *Server, error) {
 	files, err := buildFileService(cfg)
 	if err != nil {
@@ -47,6 +49,7 @@ func NewServer(cfg *config.Config) (http.Handler, *Server, error) {
 	return rtr, srv, nil
 }
 
+// buildFileService подключает хранилище метаданных и собирает файловый use-case.
 func buildFileService(cfg *config.Config) (filesvc.Service, error) {
 	var (
 		repo filesvc.MetaStorage
@@ -79,6 +82,7 @@ func buildFileService(cfg *config.Config) (filesvc.Service, error) {
 	return fileManager, nil
 }
 
+// addStorages позволяет администратору добавить список стораджей в рантайме.
 func (s *Server) addStorages(w http.ResponseWriter, r *http.Request) {
 	var payload addStoragesRequest
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {

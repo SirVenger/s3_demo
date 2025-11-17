@@ -23,6 +23,7 @@ type (
 	}
 )
 
+// Deps описывает внешние компоненты, которые требуются сервису файлов.
 type Deps struct {
 	MetaStorage MetaStorage
 	Router      *Router
@@ -30,6 +31,7 @@ type Deps struct {
 	Parts       int
 }
 
+// Files реализует бизнес-логику сервиса загрузки на базе переданных зависимостей.
 type Files struct {
 	Deps
 }

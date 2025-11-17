@@ -7,6 +7,7 @@ import (
 	"github.com/sir_venger/s3_lite/pkg/httperrors"
 )
 
+// getFile стримит файл по идентификатору напрямую в http.ResponseWriter.
 func (s *Server) getFile(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 

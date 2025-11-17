@@ -3,7 +3,10 @@ package models
 import "errors"
 
 var (
-	ErrNotFound   = errors.New("file not found")
+	// ErrNotFound возвращается, когда метаданные файла отсутствуют в хранилище.
+	ErrNotFound = errors.New("file not found")
+	// ErrIncomplete сигнализирует о пропавших частях файла.
 	ErrIncomplete = errors.New("file incomplete")
-	ErrNoStorage  = errors.New("no storage ready")
+	// ErrNoStorage означает отсутствие живых стораджей для распределения частей.
+	ErrNoStorage = errors.New("no storage ready")
 )

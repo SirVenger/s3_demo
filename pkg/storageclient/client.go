@@ -1,3 +1,4 @@
+// Package storageclient инкапсулирует HTTP-клиента для общения со стораджами.
 package storageclient
 
 import (
@@ -10,6 +11,7 @@ import (
 	"github.com/sir_venger/s3_lite/pkg/storageproto"
 )
 
+// PutPartRequest описывает параметры загрузки отдельной части файла.
 type PutPartRequest struct {
 	FileID     string
 	Index      int
@@ -19,6 +21,7 @@ type PutPartRequest struct {
 	TotalParts int
 }
 
+// Client абстрагирует HTTP-взаимодействие со сториджем частей.
 type Client interface {
 	// PutPart Положить часть файла в хранилище
 	PutPart(ctx context.Context, baseURL string, req PutPartRequest) error

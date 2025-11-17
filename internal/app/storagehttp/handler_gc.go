@@ -8,10 +8,12 @@ import (
 	"time"
 )
 
+// manualGCTTL используется для ручного GC через HTTP (длинный TTL, чтобы не удалять свежие загрузки).
 const manualGCTTL = 24 * time.Hour
 
 // gcOnce вручную запускает сбор старых незавершённых директорий.
 func (a *Server) gcOnce(w http.ResponseWriter, _ *http.Request) {
+	// sweep запускаем без пропагирования ошибки наружу — /admin/gc остаётся best-effort.
 	_ = SweepOnce(a.dataDir, manualGCTTL)
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -22,6 +24,7 @@ func StartGC(root string, ttl time.Duration, every time.Duration) func() {
 		return func() {}
 	}
 
+	// Таймер и канал stop позволяют корректно прерывать GC при завершении процесса.
 	ticker := time.NewTicker(every)
 	stop := make(chan struct{})
 	var once sync.Once
@@ -47,6 +50,7 @@ func StartGC(root string, ttl time.Duration, every time.Duration) func() {
 // SweepOnce удаляет каталоги, у которых meta.json устарел и содержит неполные данные
 func SweepOnce(root string, ttl time.Duration) error {
 	now := time.Now()
+	// В корне ожидаем каталоги вида <fileID>. Находим все записи и проверяем meta.json.
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		return err
@@ -61,10 +65,12 @@ func SweepOnce(root string, ttl time.Duration) error {
 		metaPath := filepath.Join(pdir, metaFileName)
 		fi, err := os.Stat(metaPath)
 		if err != nil {
+			// meta.json ещё не создан — считаем, что загрузка продолжается.
 			continue
 		}
 
 		if now.Sub(fi.ModTime()) < ttl {
+			// Файл метаданных свежий — пропускаем.
 			continue
 		}
 
@@ -74,6 +80,7 @@ func SweepOnce(root string, ttl time.Duration) error {
 		}
 
 		if len(fm.Parts) < fm.TotalParts {
+			// Частей меньше ожидаемого числа — очистка безопасна.
 			_ = os.RemoveAll(pdir)
 		}
 	}

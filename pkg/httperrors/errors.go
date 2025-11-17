@@ -8,6 +8,7 @@ import (
 	"github.com/sir_venger/s3_lite/internal/models"
 )
 
+// Write сериализует доменные ошибки в HTTP-ответ с подходящим статусом.
 func Write(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, models.ErrNotFound):
@@ -25,6 +26,7 @@ func Write(w http.ResponseWriter, err error) {
 	}
 }
 
+// containsAny проверяет, содержится ли хотя бы один из подстрок в сообщении об ошибке.
 func containsAny(msg string, needles ...string) bool {
 	for _, s := range needles {
 		if strings.Contains(msg, s) {

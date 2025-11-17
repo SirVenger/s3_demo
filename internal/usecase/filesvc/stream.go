@@ -15,33 +15,36 @@ func (s *Files) Stream(ctx context.Context, fileID string, w io.Writer) error {
 	if err != nil {
 		return err
 	}
+
+	// Нечего отдавать, если файл состоит из нуля частей.
 	if file.TotalParts == 0 {
 		return nil
 	}
 
-	// Быстрый чек на «дырки»
+	// Быстро проверяем, что карта частей полная и включена индексация без дыр.
 	for i := 0; i < file.TotalParts; i++ {
 		if _, ok := file.Parts[i]; !ok {
 			return models.ErrIncomplete
 		}
 	}
 
+	// streamCtx позволяет синхронно отменить загрузчиков, если писатель сталкивается с ошибкой.
 	streamCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// errgroup с отменяемым контекстом
+	// errgroup с отменяемым контекстом координирует загрузку частей.
 	eg, egCtx := errgroup.WithContext(streamCtx)
 
-	// Семафор конкуренции
+	// Семафор ограничивает количество одновременных скачиваний частей.
 	sem := make(chan struct{}, file.TotalParts)
 
-	// Для каждого индекса — свой pipe
+	// Для каждого индекса держим собственный pipeReader: писатель читает строго по порядку.
 	type pipePair struct {
 		r *io.PipeReader
 	}
 	pipes := make([]pipePair, file.TotalParts)
 
-	// Поднимаем загрузчики: каждый пишет свою часть в pipeWriter.
+	// Поднимаем загрузчики: каждый читает свою часть из стораджа и пишет в pipeWriter.
 	for idx := 0; idx < file.TotalParts; idx++ {
 		idx := idx
 		part := file.Parts[idx]
@@ -58,6 +61,7 @@ func (s *Files) Stream(ctx context.Context, fileID string, w io.Writer) error {
 			}
 			defer func() { <-sem }()
 
+			// Читаем часть из конкретного сториджа; reader закроем после копирования.
 			rc, err := s.StorageCli.GetPart(egCtx, part.Storage, file.ID, idx)
 			if err != nil {
 				_ = pw.CloseWithError(err)
@@ -65,6 +69,7 @@ func (s *Files) Stream(ctx context.Context, fileID string, w io.Writer) error {
 			}
 			defer rc.Close()
 
+			// Передаём байты в pipe; ошибки propagate через CloseWithError.
 			_, copyErr := io.Copy(pw, rc)
 			closeErr := pw.CloseWithError(copyErr)
 			if copyErr != nil {
@@ -81,12 +86,14 @@ func (s *Files) Stream(ctx context.Context, fileID string, w io.Writer) error {
 	for idx := 0; idx < file.TotalParts; idx++ {
 		reader := pipes[idx].r
 		if _, err = io.Copy(w, reader); err != nil {
+			// Любая ошибка записи отменяет контекст и закрывает оставшиеся пайпы.
 			cancel()
 			_ = reader.CloseWithError(err)
 			for j := idx + 1; j < file.TotalParts; j++ {
 				_ = pipes[j].r.CloseWithError(err)
 			}
 
+			// Подождём загрузчиков; если они были отменены, игнорируем context.Canceled.
 			waitErr := eg.Wait()
 			if waitErr != nil && !errors.Is(waitErr, context.Canceled) {
 				return waitErr
@@ -95,6 +102,7 @@ func (s *Files) Stream(ctx context.Context, fileID string, w io.Writer) error {
 		}
 
 		if err = reader.Close(); err != nil {
+			// Закрытие пайпа — сигнал загрузчику; если упали, закрываем остальные и отменяем контекст.
 			cancel()
 			for j := idx + 1; j < file.TotalParts; j++ {
 				_ = pipes[j].r.CloseWithError(err)
@@ -108,6 +116,7 @@ func (s *Files) Stream(ctx context.Context, fileID string, w io.Writer) error {
 		}
 	}
 
+	// Убедимся, что все загрузчики завершились чисто.
 	if err = eg.Wait(); err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}

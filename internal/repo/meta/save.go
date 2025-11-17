@@ -36,7 +36,7 @@ func (s *PGStore) Save(ctx context.Context, file models.File) error {
 		return fmt.Errorf("build upsert sql: %w", err)
 	}
 
-	// Выполнение
+	// Выполнение UPSERT'а
 	if _, err := s.pool.Exec(ctx, sqlStr, args...); err != nil {
 		return fmt.Errorf("exec upsert: %w", err)
 	}

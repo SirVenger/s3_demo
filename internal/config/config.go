@@ -7,6 +7,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Config описывает все настройки, необходимые приложению.
 type Config struct {
 	ListenAddr string   `yaml:"listen_addr" json:"listen_addr"`
 	MetaDSN    string   `yaml:"meta_dsn" json:"meta_dsn"`
@@ -40,6 +41,7 @@ func Load() (*Config, error) {
 	return &c, nil
 }
 
+// splitComma разбивает строку на элементы, отбрасывая пустые значения.
 func splitComma(s string) []string {
 	var out []string
 	for _, p := range strings.Split(s, ",") {
@@ -52,6 +54,7 @@ func splitComma(s string) []string {
 	return out
 }
 
+// getenv возвращает значение переменной окружения или дефолт.
 func getenv(k, def string) string {
 	if v := os.Getenv(k); v != "" {
 		return v

@@ -14,6 +14,7 @@ import (
 	"github.com/sir_venger/s3_lite/internal/config"
 )
 
+// main инициализирует REST HTTP-сервис и обеспечивает корректное завершение по сигналу.
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -33,6 +34,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// Сценарий graceful shutdown при получении SIGTERM/SIGINT.
 	go func() {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

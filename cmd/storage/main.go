@@ -24,6 +24,7 @@ const (
 	defaultGCIntervalMin = 30
 )
 
+// main запускает standalone storage-сервер, обслуживающий части файлов.
 func main() {
 	addr := flag.String("addr", defaultStorageAddr, "listen address")
 	flag.Parse()

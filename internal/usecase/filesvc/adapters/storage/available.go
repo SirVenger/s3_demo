@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+// healthHTTPClient переиспользуется всеми проверками, чтобы не плодить коннекты.
 var healthHTTPClient = &http.Client{Timeout: 2 * time.Second}
 
 // HealthAdapter определяет готовность стораджей по их health-эндпоинтам
@@ -61,6 +62,7 @@ func (a *HealthAdapter) Available(ctx context.Context, storages []string) []stri
 	return result
 }
 
+// loadAcceptable фильтрует стораджи по верхнему порогу заполненности, если он задан.
 func (a *HealthAdapter) loadAcceptable(load int64) bool {
 	if a.MaxStorageLoadBytes <= 0 {
 		return true
@@ -74,6 +76,7 @@ type storageHealth struct {
 	TotalBytes int64 `json:"total_bytes"`
 }
 
+// fetchStorageHealth обращается к /health указанного стораджа и возвращает полезную нагрузку.
 func fetchStorageHealth(ctx context.Context, base string) (payload storageHealth, err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, healthURL(base), nil)
 	if err != nil {
@@ -97,6 +100,7 @@ func fetchStorageHealth(ctx context.Context, base string) (payload storageHealth
 	return payload, nil
 }
 
+// healthURL нормализует базовый URL и добавляет суффикс /health.
 func healthURL(base string) string {
 	return strings.TrimRight(base, "/") + "/health"
 }
